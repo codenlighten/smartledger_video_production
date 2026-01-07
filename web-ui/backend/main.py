@@ -1,6 +1,6 @@
 """
-HunyuanVideo Web UI - FastAPI Backend
-Modern API for video generation with WebSocket support
+HunyuanVideo Web UI - FastAPI Backend with Optimization
+Modern API for video generation with Redis caching and adaptive generation
 """
 import asyncio
 import json
@@ -17,7 +17,11 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import subprocess
 
-app = FastAPI(title="HunyuanVideo API", version="1.0.0")
+# Import optimization modules
+from cache_manager import cache_manager
+from adaptive_optimizer import adaptive_optimizer
+
+app = FastAPI(title="HunyuanVideo API", version="2.0.0")
 
 # CORS configuration
 app.add_middleware(
@@ -37,14 +41,29 @@ jobs: Dict[str, dict] = {}
 active_connections: List[WebSocket] = []
 
 
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on startup"""
+    await cache_manager.connect()
+    print("🚀 HunyuanVideo API started with optimizations enabled")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    await cache_manager.disconnect()
+    print("👋 HunyuanVideo API shutdown complete")
+
+
 class VideoRequest(BaseModel):
     prompt: str = Field(..., description="Text prompt for video generation")
-    video_size: int = Field(720, description="Video resolution (540 or 720)")
+    video_size: str = Field("540p", description="Video resolution: 540p or 720p")
     video_length: int = Field(129, description="Number of frames (1-129)")
-    infer_steps: int = Field(50, description="Inference steps (30-100)")
+    infer_steps: int = Field(0, description="Inference steps (0 for auto-adaptive)")
     seed: Optional[int] = Field(None, description="Random seed for reproducibility")
     cfg_scale: float = Field(6.0, description="Classifier-free guidance scale")
     flow_reverse: bool = Field(True, description="Enable flow reversal")
+    quality_tier: str = Field("auto", description="Quality tier: preview/standard/premium/auto")
 
 
 class JobStatus(BaseModel):
@@ -80,32 +99,64 @@ async def broadcast_status(job_id: str):
 
 
 async def run_generation(job_id: str, request: VideoRequest):
-    """Execute video generation in Docker container"""
+    """Execute video generation with optimization"""
     try:
+        # Check embedding cache first
+        cache_hit = False
+        cached_data = await cache_manager.get_embedding(request.prompt)
+        if cached_data:
+            cache_hit = True
+            print(f"✅ Using cached embeddings for: {request.prompt[:50]}...")
+        
+        # Get optimized parameters
+        optimized = adaptive_optimizer.optimize_parameters(
+            prompt=request.prompt,
+            video_size=request.video_size,
+            infer_steps=request.infer_steps,
+            quality_tier=request.quality_tier
+        )
+        
+        # Store optimization metadata
+        jobs[job_id]["optimization"] = {
+            "cache_hit": cache_hit,
+            "complexity": optimized["complexity"],
+            "final_steps": optimized["infer_steps"],
+            "estimated_time": optimized["estimated_time_min"],
+            "quality_tier": request.quality_tier
+        }
+        
         jobs[job_id]["status"] = "processing"
         jobs[job_id]["progress"] = 10
         await broadcast_status(job_id)
         
-        # Build command
+        # Map resolution to height/width
+        if request.video_size == "540p":
+            video_height, video_width = 544, 960
+        else:  # 720p
+            video_height, video_width = 720, 1280
+        
+        # Build command with optimized parameters
         cmd = [
             "docker", "exec", "hunyuan-video",
             "python", "sample_video.py",
-            "--video-size", str(request.video_size),
+            "--video-size", str(video_height), str(video_width),
             "--video-length", str(request.video_length),
-            "--infer-steps", str(request.infer_steps),
+            "--infer-steps", str(optimized["infer_steps"]),
             "--prompt", request.prompt,
-            "--embedded-cfg-scale", str(request.cfg_scale),
-            "--save-path", f"/workspace/HunyuanVideo/results/{job_id}"
+            "--embedded-cfg-scale", str(optimized["cfg_scale"]),
+            "--save-path", f"/workspace/HunyuanVideo/results/{job_id}",
+            "--use-cpu-offload"
         ]
         
         if request.seed is not None:
             cmd.extend(["--seed", str(request.seed)])
         
-        if request.flow_reverse:
+        if optimized["flow_reverse"]:
             cmd.append("--flow-reverse")
         
         # Run generation
         start_time = datetime.now()
+        print(f"🎬 Starting generation: {optimized['infer_steps']} steps, {optimized['estimated_time_min']}min estimated")
         
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -131,6 +182,7 @@ async def run_generation(job_id: str, request: VideoRequest):
         await asyncio.gather(read_output(), process.wait())
         
         duration = (datetime.now() - start_time).total_seconds()
+        jobs[job_id]["duration"] = duration
         
         if process.returncode == 0:
             # Find generated video
@@ -142,7 +194,14 @@ async def run_generation(job_id: str, request: VideoRequest):
                 jobs[job_id]["progress"] = 100
                 jobs[job_id]["video_path"] = str(videos[0])
                 jobs[job_id]["completed_at"] = datetime.now().isoformat()
-                jobs[job_id]["duration"] = duration
+                
+                # Cache embedding metadata for future use
+                if not cache_hit:
+                    await cache_manager.set_embedding(request.prompt, {
+                        "timestamp": datetime.now().isoformat(),
+                        "steps": optimized["infer_steps"],
+                        "complexity": optimized["complexity"]
+                    })
                 
                 # Generate thumbnail (first frame)
                 thumbnail_path = result_dir / "thumbnail.jpg"
@@ -155,6 +214,8 @@ async def run_generation(job_id: str, request: VideoRequest):
                     stderr=asyncio.subprocess.DEVNULL
                 )
                 jobs[job_id]["thumbnail_path"] = str(thumbnail_path)
+                
+                print(f"✅ Generation complete: {duration:.1f}s (estimated {optimized['estimated_time_min']*60}s)")
             else:
                 jobs[job_id]["status"] = "failed"
                 jobs[job_id]["error"] = "No video file generated"
@@ -302,6 +363,13 @@ async def get_stats():
     """Get generation statistics"""
     completed = [j for j in jobs.values() if j["status"] == "completed"]
     
+    # Get cache stats
+    cache_stats = await cache_manager.get_stats()
+    
+    # Calculate optimization metrics
+    cache_hits = sum(1 for j in completed if j.get("optimization", {}).get("cache_hit"))
+    avg_steps = sum(j.get("optimization", {}).get("final_steps", 30) for j in completed) / len(completed) if completed else 30
+    
     return {
         "total_generations": len(jobs),
         "completed": len(completed),
@@ -309,7 +377,32 @@ async def get_stats():
         "in_progress": sum(1 for j in jobs.values() if j["status"] == "processing"),
         "queued": sum(1 for j in jobs.values() if j["status"] == "queued"),
         "avg_duration": sum(j.get("duration", 0) for j in completed) / len(completed) if completed else 0,
-        "total_duration": sum(j.get("duration", 0) for j in completed)
+        "total_duration": sum(j.get("duration", 0) for j in completed),
+        "optimization": {
+            "cache_enabled": cache_stats.get("enabled", False),
+            "cache_hits": cache_hits,
+            "cache_hit_rate": round((cache_hits / len(completed) * 100) if completed else 0, 1),
+            "avg_steps": round(avg_steps, 1),
+            "adaptive_enabled": adaptive_optimizer.enabled
+        },
+        "cache_stats": cache_stats
+    }
+
+
+@app.get("/api/optimization/analyze")
+async def analyze_prompt(prompt: str, quality_tier: str = "auto"):
+    """Analyze a prompt and return optimization recommendations"""
+    optimized = adaptive_optimizer.optimize_parameters(
+        prompt=prompt,
+        video_size="540p",
+        infer_steps=0,
+        quality_tier=quality_tier
+    )
+    
+    return {
+        "prompt": prompt,
+        "analysis": optimized,
+        "cache_available": await cache_manager.get_embedding(prompt) is not None
     }
 
 

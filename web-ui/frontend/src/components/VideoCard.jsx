@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Play, Download, Trash2, Clock, CheckCircle, XCircle, Loader, X } from 'lucide-react';
+import OptimizationBadge from './OptimizationBadge';
 
 export default function VideoCard({ job, onDelete }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -100,6 +101,11 @@ export default function VideoCard({ job, onDelete }) {
         )}
       </div>
 
+      {/* Optimization Badges */}
+      {job.optimization && (
+        <OptimizationBadge optimization={job.optimization} />
+      )}
+
       {/* Error message */}
       {job.status === 'failed' && job.error && (
         <div className="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
@@ -137,9 +143,6 @@ export default function VideoCard({ job, onDelete }) {
           </button>
         )}
       </div>
-    </div>
-  );
-}
 
       {/* Video Player Modal */}
       {isPlaying && (
@@ -163,3 +166,6 @@ export default function VideoCard({ job, onDelete }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}

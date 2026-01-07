@@ -1,18 +1,42 @@
 import { useState } from 'react';
-import { Sparkles, Settings, Video } from 'lucide-react';
+import { Sparkles, Settings, Video, Zap, Clock } from 'lucide-react';
 
 export default function GenerationForm({ onGenerate, generating }) {
   const [formData, setFormData] = useState({
     prompt: '',
-    video_size: 720,
+    quality_tier: 'standard',
     video_length: 129,
-    infer_steps: 50,
+    infer_steps: null,  // Auto-optimized by default
     seed: null,
     cfg_scale: 6.0,
     flow_reverse: true
   });
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const qualityTiers = {
+    preview: {
+      label: 'Preview',
+      icon: Zap,
+      time: '~2 min',
+      description: 'Fast preview for testing',
+      color: 'text-yellow-500'
+    },
+    standard: {
+      label: 'Standard',
+      icon: Video,
+      time: '~5 min',
+      description: 'Balanced quality and speed',
+      color: 'text-blue-500'
+    },
+    premium: {
+      label: 'Premium',
+      icon: Sparkles,
+      time: '~10 min',
+      description: 'Highest quality output',
+      color: 'text-purple-500'
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -66,50 +90,54 @@ export default function GenerationForm({ onGenerate, generating }) {
       </div>
 
       {/* Quick Settings */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="space-y-4">
+        {/* Quality Tier Selection */}
         <div>
-          <label className="block text-sm font-medium mb-2">
-            <Video className="inline w-4 h-4 mr-1" />
-            Resolution
+          <label className="block text-sm font-medium mb-3">
+            Quality Tier
           </label>
-          <select
-            value={formData.video_size}
-            onChange={(e) => setFormData({ ...formData, video_size: parseInt(e.target.value) })}
-            className="input w-full"
-          >
-            <option value={540}>540p (Faster)</option>
-            <option value={720}>720p (Better Quality)</option>
-          </select>
+          <div className="grid grid-cols-3 gap-3">
+            {Object.entries(qualityTiers).map(([tier, config]) => {
+              const Icon = config.icon;
+              const isSelected = formData.quality_tier === tier;
+              
+              return (
+                <button
+                  key={tier}
+                  type="button"
+                  onClick={() => setFormData({ ...formData, quality_tier: tier })}
+                  className={`
+                    p-4 rounded-lg border-2 transition-all
+                    ${isSelected 
+                      ? 'border-primary-500 bg-primary-500/10' 
+                      : 'border-dark-border hover:border-dark-hover'
+                    }
+                  `}
+                >
+                  <Icon className={`w-6 h-6 mx-auto mb-2 ${config.color}`} />
+                  <div className="text-sm font-semibold mb-1">{config.label}</div>
+                  <div className="text-xs text-gray-400 mb-1">{config.time}</div>
+                  <div className="text-xs text-gray-500">{config.description}</div>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
+        {/* Video Length */}
         <div>
           <label className="block text-sm font-medium mb-2">
-            Frames
+            <Clock className="inline w-4 h-4 mr-1" />
+            Video Length: {formData.video_length} frames (~{Math.round(formData.video_length / 25 * 10) / 10}s)
           </label>
           <input
-            type="number"
-            min={1}
-            max={129}
+            type="range"
+            min="1"
+            max="129"
             value={formData.video_length}
             onChange={(e) => setFormData({ ...formData, video_length: parseInt(e.target.value) })}
-            className="input w-full"
+            className="w-full"
           />
-          <p className="text-xs text-gray-500 mt-1">~5 seconds at 25fps</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            Quality Steps
-          </label>
-          <input
-            type="number"
-            min={30}
-            max={100}
-            value={formData.infer_steps}
-            onChange={(e) => setFormData({ ...formData, infer_steps: parseInt(e.target.value) })}
-            className="input w-full"
-          />
-          <p className="text-xs text-gray-500 mt-1">Higher = better quality</p>
         </div>
       </div>
 
