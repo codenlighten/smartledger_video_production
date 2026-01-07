@@ -92,18 +92,19 @@ class AdaptiveOptimizer:
         complexity_score += min(subject_count, 2)
         
         # Determine complexity level and steps
+        # Note: HunyuanVideo requires minimum 30 steps for proper denoising
         if complexity_score <= 3:
             level = ComplexityLevel.SIMPLE
-            steps = 18
+            steps = 30  # Increased from 18 to ensure proper denoising
         elif complexity_score <= 7:
             level = ComplexityLevel.MODERATE
-            steps = 25
+            steps = 35  # Increased from 25
         elif complexity_score <= 12:
             level = ComplexityLevel.COMPLEX
-            steps = 35
+            steps = 45  # Increased from 35
         else:
             level = ComplexityLevel.VERY_COMPLEX
-            steps = 45
+            steps = 50  # Increased from 45
         
         print(f"📊 Prompt Analysis:")
         print(f"   Complexity Score: {complexity_score}/17")
@@ -136,11 +137,11 @@ class AdaptiveOptimizer:
         
         # Handle quality tiers
         if quality_tier == "preview":
-            # Fast preview mode - sacrifice quality for speed
-            final_steps = min(15, recommended_steps // 2)
+            # Fast preview mode - still needs minimum 25 steps for visible content
+            final_steps = max(25, recommended_steps - 10)  # At least 25 steps minimum
             cfg_scale = 5.0  # Lower CFG for faster convergence
             flow_reverse = False  # Disable for speed
-            print("🚀 PREVIEW MODE: Maximum speed, lower quality")
+            print("🚀 PREVIEW MODE: Faster generation, good quality")
             
         elif quality_tier == "premium":
             # Premium mode - maximize quality
