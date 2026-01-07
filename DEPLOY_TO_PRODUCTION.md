@@ -51,6 +51,15 @@ docker-compose build --no-cache
 docker-compose up -d
 ```
 
+### 7.5. Ensure HunyuanVideo Container Has GPU Access
+```bash
+cd ../deployment/scripts
+./start-hunyuan-container.sh
+cd ../../web-ui
+```
+
+**IMPORTANT**: The HunyuanVideo container must be started with `--gpus all` flag to access the H100 GPU. This script ensures proper GPU access.
+
 ### 8. Verify Services are Running
 ```bash
 docker-compose ps
