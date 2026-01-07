@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: hunyuan-api
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/hunyuan-video/results:/opt/hunyuan-video/results
+    environment:
+      - PYTHONUNBUFFERED=1
+    ports:
+      - "8000:8000"
+    networks:
+      - hunyuan-net
+
+  frontend:
+    build: ./frontend
+    container_name: hunyuan-ui
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - hunyuan-net
+
+networks:
+  hunyuan-net:
+    driver: bridge
