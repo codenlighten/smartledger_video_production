@@ -21,6 +21,7 @@ This folder provides automation to deploy Tencent HunyuanVideo on DigitalOcean G
 - `GPU_SELECTION_GUIDE.md` — Detailed GPU comparison and recommendations
 - `COST_COMPARISON.md` — Cost analysis vs Veo 3 and other cloud APIs
 - `USE_CASES.md` — Business applications and monetization strategies
+- `FEATURE_FILM_PRODUCTION.md` — 90-minute movie production cost analysis and workflow
 
 ## Quick Paths
 - Manual VM: Use `scripts/startup.sh` as cloud-init/user-data
