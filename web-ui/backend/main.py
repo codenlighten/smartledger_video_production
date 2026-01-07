@@ -138,13 +138,13 @@ async def run_generation(job_id: str, request: VideoRequest):
         # Build command with optimized parameters
         cmd = [
             "docker", "exec", "hunyuan-video",
-            "python", "/workspace/HunyuanVideo/sample_video.py",
+            "python", "/workspace/repo/sample_video.py",
             "--video-size", str(video_height), str(video_width),
             "--video-length", str(request.video_length),
             "--infer-steps", str(optimized["infer_steps"]),
             "--prompt", request.prompt,
             "--embedded-cfg-scale", str(optimized["cfg_scale"]),
-            "--save-path", f"/workspace/HunyuanVideo/results/{job_id}",
+            "--save-path", f"/opt/hunyuan-video/results/{job_id}",
             "--use-cpu-offload"
         ]
         
@@ -207,9 +207,9 @@ async def run_generation(job_id: str, request: VideoRequest):
                 thumbnail_path = result_dir / "thumbnail.jpg"
                 await asyncio.create_subprocess_exec(
                     "docker", "exec", "hunyuan-video",
-                    "ffmpeg", "-i", f"/workspace/HunyuanVideo/results/{job_id}/{videos[0].name}",
+                    "ffmpeg", "-i", f"/opt/hunyuan-video/results/{job_id}/{videos[0].name}",
                     "-vframes", "1", "-f", "image2",
-                    f"/workspace/HunyuanVideo/results/{job_id}/thumbnail.jpg",
+                    f"/opt/hunyuan-video/results/{job_id}/thumbnail.jpg",
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL
                 )
