@@ -4,9 +4,10 @@ import { Sparkles, Settings, Video, Zap, Clock } from 'lucide-react';
 export default function GenerationForm({ onGenerate, generating }) {
   const [formData, setFormData] = useState({
     prompt: '',
-    quality_tier: 'standard',
+    video_size: '540p',  // Default to 540p
+    quality_tier: 'auto',  // Default to auto for adaptive optimization
     video_length: 129,
-    infer_steps: null,  // Auto-optimized by default
+    infer_steps: 0,  // 0 = auto-adaptive
     seed: null,
     cfg_scale: 6.0,
     flow_reverse: true
@@ -124,6 +125,44 @@ export default function GenerationForm({ onGenerate, generating }) {
           </div>
         </div>
 
+        {/* Video Size Selection */}
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            <Video className="inline w-4 h-4 mr-1" />
+            Video Resolution
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, video_size: '540p' })}
+              className={`
+                p-3 rounded-lg border-2 transition-all text-sm
+                ${formData.video_size === '540p'
+                  ? 'border-primary-500 bg-primary-500/10 text-white' 
+                  : 'border-dark-border hover:border-dark-hover text-gray-400'
+                }
+              `}
+            >
+              <div className="font-semibold">540p</div>
+              <div className="text-xs opacity-75">544×960 (Faster)</div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData({ ...formData, video_size: '720p' })}
+              className={`
+                p-3 rounded-lg border-2 transition-all text-sm
+                ${formData.video_size === '720p'
+                  ? 'border-primary-500 bg-primary-500/10 text-white' 
+                  : 'border-dark-border hover:border-dark-hover text-gray-400'
+                }
+              `}
+            >
+              <div className="font-semibold">720p</div>
+              <div className="text-xs opacity-75">720×1280 (Higher Quality)</div>
+            </button>
+          </div>
+        </div>
+
         {/* Video Length */}
         <div>
           <label className="block text-sm font-medium mb-2">
@@ -154,6 +193,22 @@ export default function GenerationForm({ onGenerate, generating }) {
       {showAdvanced && (
         <div className="space-y-4 p-4 bg-dark-hover rounded-lg border border-dark-border">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Inference Steps
+              </label>
+              <input
+                type="number"
+                min={10}
+                max={100}
+                value={formData.infer_steps || ''}
+                onChange={(e) => setFormData({ ...formData, infer_steps: e.target.value ? parseInt(e.target.value) : null })}
+                placeholder="Auto (optimized)"
+                className="input w-full"
+              />
+              <p className="text-xs text-gray-500 mt-1">Leave empty for auto-optimization</p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium mb-2">
                 Random Seed
