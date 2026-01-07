@@ -138,7 +138,7 @@ async def run_generation(job_id: str, request: VideoRequest):
         # Build command with optimized parameters
         cmd = [
             "docker", "exec", "hunyuan-video",
-            "python", "sample_video.py",
+            "python", "/workspace/HunyuanVideo/sample_video.py",
             "--video-size", str(video_height), str(video_width),
             "--video-length", str(request.video_length),
             "--infer-steps", str(optimized["infer_steps"]),
